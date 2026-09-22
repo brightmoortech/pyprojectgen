@@ -2,7 +2,7 @@ import argparse
 
 from config import init_config, validate_config
 from models import Result, ValidationReport
-from preflight import run_preflight
+from workflow import run_create_workflow
 
 
 def print_result(result: Result) -> None:
@@ -62,14 +62,10 @@ def main() -> None:
         print_report(validate_config())
 
     elif args.command == "create":
-        report = run_preflight(args.project_name)
-        print_report(report)
-
-        if report.has_errors:
-            return
-
-        mode = "DRY RUN" if args.dry_run else "CREATE"
-        print(f"[{mode}] Preflight complete for project '{args.project_name}'")
+        run_create_workflow(
+            project_name=args.project_name,
+            dry_run=args.dry_run,
+        )
 
 
 if __name__ == "__main__":
