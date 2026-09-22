@@ -1,0 +1,32 @@
+
+[paths]
+# Root directory under which development projects will be created.
+# Example: /Users/alice/code/develop
+development_root = ""
+
+# Root directory under which staging projects will be created.
+# Example: /Users/alice/code/stage
+stage_root = ""
+
+[github]
+# GitHub organization or username that owns repositories.
+organization = ""
+
+# Allowed values: "private" or "public".
+default_visibility = "private"
+
+# SSH host or alias from ~/.ssh/config.
+# Example: github.com or github.com-work
+ssh_host = ""
+
+[git]
+# Must match: git config user.name
+user_name = ""
+
+# Must match: git config user.email
+user_email = ""
+
+[ssh]
+# Optional unless GitHub SSH integration is used.
+private_key = ""
+public_key = ""
