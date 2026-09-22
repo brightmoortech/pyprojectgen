@@ -1,0 +1,17 @@
+
+[paths]
+development_root = "/path/to/development-root"
+stage_root = "/path/to/staging-root"
+
+[github]
+organization = "<github-organization-or-username>"
+default_visibility = "private"
+ssh_host = "<ssh-host-alias>"
+
+[git]
+user_name = "<git-user-name>"
+user_email = "<git-user-email>"
+
+[ssh]
+private_key = "/path/to/private-key"
+public_key = "/path/to/public-key"
