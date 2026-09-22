@@ -1,8 +1,8 @@
-
 import argparse
 
 from config import init_config, validate_config
 from models import Result, ValidationReport
+from preflight import run_preflight
 
 
 def print_result(result: Result) -> None:
@@ -16,11 +16,11 @@ def print_report(report: ValidationReport) -> None:
     print()
 
     if report.has_errors:
-        print("[ERROR] Configuration validation failed")
+        print("[ERROR] Validation failed")
     elif report.has_warnings:
-        print("[OK] Configuration valid with warnings")
+        print("[OK] Validation passed with warnings")
     else:
-        print("[OK] Configuration valid")
+        print("[OK] Validation passed")
 
 
 def main() -> None:
@@ -37,6 +37,22 @@ def main() -> None:
         help="Validate ~/.pyprojectgenrc without modifying it",
     )
 
+    create_parser = subparsers.add_parser(
+        "create",
+        help="Create a new Python project",
+    )
+
+    create_parser.add_argument(
+        "project_name",
+        help="Name of the project to create",
+    )
+
+    create_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show planned actions without modifying the system",
+    )
+
     args = parser.parse_args()
 
     if args.command == "config-init":
@@ -44,6 +60,16 @@ def main() -> None:
 
     elif args.command == "config-validate":
         print_report(validate_config())
+
+    elif args.command == "create":
+        report = run_preflight(args.project_name)
+        print_report(report)
+
+        if report.has_errors:
+            return
+
+        mode = "DRY RUN" if args.dry_run else "CREATE"
+        print(f"[{mode}] Preflight complete for project '{args.project_name}'")
 
 
 if __name__ == "__main__":
