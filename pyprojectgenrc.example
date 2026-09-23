@@ -12,9 +12,6 @@ stage_root = ""
 # GitHub organization or username that owns repositories.
 organization = ""
 
-# Allowed values: "private" or "public".
-default_visibility = "private"
-
 # SSH host or alias from ~/.ssh/config.
 # Example: github.com or github.com-work
 ssh_host = ""

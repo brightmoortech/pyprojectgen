@@ -21,9 +21,6 @@ stage_root = ""
 # GitHub organization or username that owns repositories.
 organization = ""
 
-# Allowed values: "private" or "public".
-default_visibility = "private"
-
 # SSH host or alias from ~/.ssh/config.
 # Example: github.com or github.com-work
 ssh_host = ""
@@ -157,7 +154,7 @@ def validate_config() -> ValidationReport:
 
     required_keys = {
         "paths": ("development_root", "stage_root"),
-        "github": ("organization", "default_visibility", "ssh_host"),
+        "github": ("organization", "ssh_host"),
         "git": ("user_name", "user_email"),
         "ssh": ("private_key", "public_key"),
     }
@@ -211,23 +208,6 @@ def validate_config() -> ValidationReport:
             Result(
                 Status.OK,
                 "github.organization configured",
-            )
-        )
-
-    visibility = github["default_visibility"]
-
-    if visibility not in {"private", "public"}:
-        results.append(
-            Result(
-                Status.ERROR,
-                "github.default_visibility must be 'private' or 'public'",
-            )
-        )
-    else:
-        results.append(
-            Result(
-                Status.OK,
-                f"github.default_visibility is '{visibility}'",
             )
         )
 
