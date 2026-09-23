@@ -272,6 +272,7 @@ def configure_github_remote(
     )
 
 
+
 def plan_initial_push(project_root: Path) -> ValidationReport:
     branch_result = _run_command(
         ["git", "branch", "--show-current"],
@@ -317,20 +318,113 @@ def plan_initial_push(project_root: Path) -> ValidationReport:
             )
         )
 
+    upstream_result = _run_command(
+        [
+            "git",
+            "rev-parse",
+            "--abbrev-ref",
+            "--symbolic-full-name",
+            "@{u}",
+        ],
+        cwd=project_root,
+    )
+
+    if upstream_result.returncode != 0:
+        return ValidationReport(
+            results=(
+                Result(
+                    Status.CREATE,
+                    f"Push branch '{branch}' to origin and set upstream",
+                ),
+            )
+        )
+
+    upstream = upstream_result.stdout.strip()
+    expected_upstream = f"origin/{branch}"
+
+    if upstream != expected_upstream:
+        return ValidationReport(
+            results=(
+                Result(
+                    Status.ERROR,
+                    (
+                        f"Branch '{branch}' tracks '{upstream}', "
+                        f"expected '{expected_upstream}'"
+                    ),
+                ),
+            )
+        )
+
+    sync_result = _run_command(
+        [
+            "git",
+            "rev-list",
+            "--left-right",
+            "--count",
+            f"{upstream}...HEAD",
+        ],
+        cwd=project_root,
+    )
+
+    if sync_result.returncode != 0:
+        message = sync_result.stderr.strip() or sync_result.stdout.strip()
+
+        return ValidationReport(
+            results=(
+                Result(
+                    Status.ERROR,
+                    f"Could not compare local branch with upstream: {message}",
+                ),
+            )
+        )
+
+    behind_text, ahead_text = sync_result.stdout.strip().split()
+
+    behind = int(behind_text)
+    ahead = int(ahead_text)
+
+    if behind == 0 and ahead == 0:
+        return ValidationReport(
+            results=(
+                Result(
+                    Status.SKIP,
+                    f"Branch '{branch}' already tracks {upstream} and is synchronized",
+                ),
+            )
+        )
+
+    if behind > 0:
+        return ValidationReport(
+            results=(
+                Result(
+                    Status.ERROR,
+                    (
+                        f"Branch '{branch}' is {behind} commit(s) behind "
+                        f"{upstream}"
+                    ),
+                ),
+            )
+        )
+
     return ValidationReport(
         results=(
             Result(
                 Status.CREATE,
-                f"Push branch '{branch}' to origin and set upstream",
+                f"Push {ahead} local commit(s) from '{branch}' to {upstream}",
             ),
         )
     )
+
+
 
 
 def push_initial_branch(project_root: Path) -> ValidationReport:
     plan = plan_initial_push(project_root)
 
     if plan.has_errors:
+        return plan
+
+    if all(result.status is Status.SKIP for result in plan.results):
         return plan
 
     if all(result.status is Status.WARNING for result in plan.results):

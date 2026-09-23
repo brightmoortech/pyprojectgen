@@ -67,10 +67,14 @@ def _stop_if_errors(report: ValidationReport) -> bool:
     return False
 
 
-def _dry_run_git_repository(project_root: Path) -> ValidationReport:
+def _dry_run_git_repository(
+    project_root: Path,
+) -> ValidationReport:
     if (project_root / ".git").is_dir():
         status = Status.SKIP
-        message = f"Git repository already initialized: {project_root}"
+        message = (
+            f"Git repository already initialized: {project_root}"
+        )
     else:
         status = Status.CREATE
         message = f"Git repository: {project_root}"
@@ -82,7 +86,9 @@ def _dry_run_git_repository(project_root: Path) -> ValidationReport:
     )
 
 
-def _dry_run_initial_commit(project_root: Path) -> ValidationReport:
+def _dry_run_initial_commit(
+    project_root: Path,
+) -> ValidationReport:
     if (project_root / ".git").is_dir():
         return plan_initial_commit(project_root)
 
@@ -130,7 +136,9 @@ def _dry_run_github_remote(
     )
 
 
-def _dry_run_initial_push(project_root: Path) -> ValidationReport:
+def _dry_run_initial_push(
+    project_root: Path,
+) -> ValidationReport:
     if (project_root / ".git").is_dir():
         return plan_initial_push(project_root)
 
@@ -191,7 +199,10 @@ def run_create_workflow(
             project_name,
         )
 
-    _print_report("Project structure", structure_report)
+    _print_report(
+        "Project structure",
+        structure_report,
+    )
 
     if _stop_if_errors(structure_report):
         return
@@ -207,7 +218,10 @@ def run_create_workflow(
             python_executable,
         )
 
-    _print_report("Python environment", python_report)
+    _print_report(
+        "Python environment",
+        python_report,
+    )
 
     if _stop_if_errors(python_report):
         return
@@ -223,17 +237,27 @@ def run_create_workflow(
             project_name,
         )
 
-    _print_report("Project files", files_report)
+    _print_report(
+        "Project files",
+        files_report,
+    )
 
     if _stop_if_errors(files_report):
         return
 
     if dry_run:
-        git_init_report = _dry_run_git_repository(project_root)
+        git_init_report = _dry_run_git_repository(
+            project_root,
+        )
     else:
-        git_init_report = initialize_git_repository(project_root)
+        git_init_report = initialize_git_repository(
+            project_root,
+        )
 
-    _print_report("Git repository", git_init_report)
+    _print_report(
+        "Git repository",
+        git_init_report,
+    )
 
     if _stop_if_errors(git_init_report):
         return
@@ -250,17 +274,27 @@ def run_create_workflow(
         git_user_email,
     )
 
-    _print_report("Git identity", git_identity_report)
+    _print_report(
+        "Git identity",
+        git_identity_report,
+    )
 
     if _stop_if_errors(git_identity_report):
         return
 
     if dry_run:
-        commit_plan = _dry_run_initial_commit(project_root)
+        commit_plan = _dry_run_initial_commit(
+            project_root,
+        )
     else:
-        commit_plan = plan_initial_commit(project_root)
+        commit_plan = plan_initial_commit(
+            project_root,
+        )
 
-    _print_report("Initial commit", commit_plan)
+    _print_report(
+        "Initial commit",
+        commit_plan,
+    )
 
     if _stop_if_errors(commit_plan):
         return
@@ -270,7 +304,10 @@ def run_create_workflow(
         for result in commit_plan.results
     ):
         if _confirm("Create the initial Git commit?"):
-            commit_report = create_initial_commit(project_root)
+            commit_report = create_initial_commit(
+                project_root,
+            )
+
             _print_report(
                 "Initial commit execution",
                 commit_report,
@@ -282,7 +319,8 @@ def run_create_workflow(
             print()
             print("[SKIP] Initial Git commit not created")
             print(
-                "[ERROR] Workflow stopped before GitHub integration"
+                "[ERROR] Workflow stopped before "
+                "GitHub integration"
             )
             return
 
@@ -314,8 +352,14 @@ def run_create_workflow(
         print("[SKIP] Staging not configured")
         return
 
-    ssh_report = validate_github_ssh(ssh_host)
-    _print_report("GitHub SSH", ssh_report)
+    ssh_report = validate_github_ssh(
+        ssh_host,
+    )
+
+    _print_report(
+        "GitHub SSH",
+        ssh_report,
+    )
 
     if _stop_if_errors(ssh_report):
         return
@@ -341,7 +385,10 @@ def run_create_workflow(
             ssh_host,
         )
 
-    _print_report("GitHub remote", remote_plan)
+    _print_report(
+        "GitHub remote",
+        remote_plan,
+    )
 
     if _stop_if_errors(remote_plan):
         return
@@ -350,38 +397,65 @@ def run_create_workflow(
         print()
         print(
             "[CREATE] GitHub repository must exist before "
-            f"remote/push execution: {github_owner}/{project_name}"
+            f"remote/push execution: "
+            f"{github_owner}/{project_name}"
         )
 
-        push_plan = _dry_run_initial_push(project_root)
-        _print_report("Initial push", push_plan)
+        push_plan = _dry_run_initial_push(
+            project_root,
+        )
+
+        _print_report(
+            "Initial push",
+            push_plan,
+        )
 
         stage_report = plan_stage(
             stage_root,
             project_name,
             remote_url,
         )
-        _print_report("Staging", stage_report)
+
+        _print_report(
+            "Staging",
+            stage_report,
+        )
 
         if _stop_if_errors(stage_report):
             return
 
         print()
-        print("[OK] Dry run complete; no changes were made")
+        print(
+            "[OK] Dry run complete; no changes were made"
+        )
         return
 
-    print()
-    print(
-        "Create the GitHub repository manually if it does "
-        "not already exist:"
+    remote_needs_creation = any(
+        result.status is Status.CREATE
+        for result in remote_plan.results
     )
-    print(f"  {github_owner}/{project_name}")
 
-    if not _confirm("Has the GitHub repository been created?"):
+    if remote_needs_creation:
         print()
-        print("[SKIP] GitHub integration skipped")
-        print("[SKIP] Staging not configured")
-        return
+        print(
+            "Create the GitHub repository manually if it "
+            "does not already exist:"
+        )
+        print(
+            f"  {github_owner}/{project_name}"
+        )
+
+        if not _confirm(
+            "Has the GitHub repository been created?"
+        ):
+            print()
+            print(
+                "[SKIP] GitHub integration skipped"
+            )
+            print(
+                "[SKIP] Staging not configured"
+            )
+            return
 
     remote_report = configure_github_remote(
         project_root,
@@ -398,26 +472,47 @@ def run_create_workflow(
     if _stop_if_errors(remote_report):
         return
 
-    push_plan = plan_initial_push(project_root)
-    _print_report("Initial push", push_plan)
+    push_plan = plan_initial_push(
+        project_root,
+    )
+
+    _print_report(
+        "Initial push",
+        push_plan,
+    )
 
     if _stop_if_errors(push_plan):
         return
 
-    if _confirm("Push the initial branch to GitHub?"):
-        push_report = push_initial_branch(project_root)
-        _print_report(
-            "Initial push execution",
-            push_report,
-        )
+    push_needed = any(
+        result.status is Status.CREATE
+        for result in push_plan.results
+    )
 
-        if _stop_if_errors(push_report):
+    if push_needed:
+        if _confirm(
+            "Push the current branch to GitHub?"
+        ):
+            push_report = push_initial_branch(
+                project_root,
+            )
+
+            _print_report(
+                "Initial push execution",
+                push_report,
+            )
+
+            if _stop_if_errors(push_report):
+                return
+        else:
+            print()
+            print(
+                "[SKIP] GitHub push not performed"
+            )
+            print(
+                "[SKIP] Staging not configured"
+            )
             return
-    else:
-        print()
-        print("[SKIP] Initial GitHub push not performed")
-        print("[SKIP] Staging not configured")
-        return
 
     stage_report = create_stage(
         stage_root,
@@ -426,10 +521,15 @@ def run_create_workflow(
         python_executable,
     )
 
-    _print_report("Staging", stage_report)
+    _print_report(
+        "Staging",
+        stage_report,
+    )
 
     if _stop_if_errors(stage_report):
         return
 
     print()
-    print("[OK] Project creation workflow complete")
+    print(
+        "[OK] Project creation workflow complete"
+    )
