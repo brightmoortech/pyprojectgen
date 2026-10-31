@@ -1,3 +1,5 @@
+"""Create and validate machine-local setup preferences without changing Git or SSH settings."""
+
 from pathlib import Path
 import os
 import re
@@ -40,6 +42,7 @@ public_key = ""
 
 
 def init_config() -> Result:
+    """Create the configuration template only when no configuration exists."""
     if CONFIG_PATH.exists():
         return Result(
             status=Status.SKIP,
@@ -103,6 +106,7 @@ def _validate_email(value: str) -> bool:
 
 
 def validate_config() -> ValidationReport:
+    """Validate declared paths and preferences; do not provision external services."""
     results: list[Result] = []
 
     if not CONFIG_PATH.exists():
@@ -137,12 +141,9 @@ def validate_config() -> ValidationReport:
 
     for section in required_sections:
         if section not in config:
-            results.append(
-                Result(
-                    Status.ERROR,
-                    f"Missing required section: [{section}]",
-                )
-            )
+            results.append(Result(Status.ERROR, f"Missing required section: [{section}]"))
+        elif not isinstance(config[section], dict):
+            results.append(Result(Status.ERROR, f"[{section}] must be a TOML table"))
 
     if any(result.status is Status.ERROR for result in results):
         return ValidationReport(results=tuple(results))
@@ -175,6 +176,8 @@ def validate_config() -> ValidationReport:
                         f"Missing required setting: {section_name}.{key}",
                     )
                 )
+            elif not isinstance(sections[section_name][key], str):
+                results.append(Result(Status.ERROR, f"{section_name}.{key} must be a quoted string"))
 
     if any(result.status is Status.ERROR for result in results):
         return ValidationReport(results=tuple(results))
@@ -192,6 +195,14 @@ def validate_config() -> ValidationReport:
             paths["stage_root"],
         )
     )
+
+    if paths["development_root"].strip() and paths["stage_root"].strip():
+        separation = validate_independent_paths(
+            Path(paths["development_root"]).expanduser(),
+            Path(paths["stage_root"]).expanduser(),
+            check_environments=False,
+        )
+        results.extend(separation.results)
 
     organization = github["organization"]
 
@@ -315,3 +326,30 @@ def validate_config() -> ValidationReport:
             )
 
     return ValidationReport(results=tuple(results))
+
+
+def validate_independent_paths(
+    development_path: Path, staging_path: Path, *, check_environments: bool = True,
+) -> ValidationReport:
+    """Reject aliases of the same directory before staging can alter development.
+
+    Resolve existing symlinks and compare filesystem identity where available.
+    Check both project directories and their virtual environments at the caller's
+    appropriate scope; no directories are created by this validation.
+    """
+    def same_location(left: Path, right: Path) -> bool:
+        if left.resolve() == right.resolve():
+            return True
+        return left.exists() and right.exists() and left.samefile(right)
+
+    if same_location(development_path, staging_path):
+        return ValidationReport((Result(
+            Status.ERROR,
+            "Development and staging must use different directories; the configured paths resolve to the same location",
+        ),))
+    if check_environments and same_location(development_path / ".venv", staging_path / ".venv"):
+        return ValidationReport((Result(
+            Status.ERROR,
+            "Development and staging .venv paths resolve to the same environment; use independent virtual environments",
+        ),))
+    return ValidationReport(())

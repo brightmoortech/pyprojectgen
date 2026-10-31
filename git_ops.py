@@ -1,3 +1,5 @@
+"""Inspect and initialize local Git state; commits are authorized by the workflow controller."""
+
 from pathlib import Path
 import subprocess
 
@@ -49,6 +51,7 @@ def plan_git_repository(project_root: Path) -> ValidationReport:
 
 
 def initialize_git_repository(project_root: Path) -> ValidationReport:
+    """Initialize main only when the project has no Git directory."""
     plan = plan_git_repository(project_root)
 
     if plan.has_errors:
@@ -89,6 +92,7 @@ def validate_git_identity(
     expected_name: str,
     expected_email: str,
 ) -> ValidationReport:
+    """Require the effective Git identity to match preferences; never rewrite it."""
     results: list[Result] = []
 
     name_result = _run_git(
@@ -158,6 +162,7 @@ def validate_git_identity(
 
 
 def plan_initial_commit(project_root: Path) -> ValidationReport:
+    """Plan a commit when the working tree has changes; a clean tree is skipped."""
     status_result = _run_git(
         ["status", "--porcelain"],
         cwd=project_root,
@@ -203,6 +208,7 @@ def create_initial_commit(
     project_root: Path,
     message: str = "Initial project setup",
 ) -> ValidationReport:
+    """Stage all unignored project changes and commit after caller authorization."""
     plan = plan_initial_commit(project_root)
 
     if plan.has_errors:

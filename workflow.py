@@ -1,8 +1,9 @@
+"""Coordinate initial project setup, confirmation gates, and resource-based recovery."""
+
 from pathlib import Path
-import sys
 import tomllib
 
-from config import CONFIG_PATH
+from config import CONFIG_PATH, validate_config, validate_independent_paths
 from git_ops import (
     create_initial_commit,
     initialize_git_repository,
@@ -15,6 +16,7 @@ from github_ops import (
     plan_github_remote,
     plan_initial_push,
     push_initial_branch,
+    verify_remote_commit,
     validate_github_configuration,
     validate_github_ssh,
 )
@@ -28,6 +30,8 @@ from project_structure import (
 from python_env import (
     create_python_environment,
     plan_python_environment,
+    find_python,
+    select_python_version,
 )
 from stage import create_stage, plan_stage
 
@@ -48,6 +52,7 @@ def _print_report(
 
 
 def _confirm(prompt: str) -> bool:
+    """Require an explicit affirmative response; empty input declines the action."""
     print()
     response = input(f"{prompt} [y/N] ").strip().lower()
     return response in {"y", "yes"}
@@ -58,13 +63,12 @@ def _load_config() -> dict:
         return tomllib.load(file)
 
 
-def _stop_if_errors(report: ValidationReport) -> bool:
+def _stop_if_errors(report: ValidationReport) -> None:
+    """Convert a reported phase failure into a CLI failure while retaining prior work."""
     if report.has_errors:
         print()
         print("[ERROR] Workflow stopped")
-        return True
-
-    return False
+        raise ValueError("Setup failed; completed resources were retained. Correct the reported error and rerun")
 
 
 def _dry_run_git_repository(
@@ -155,7 +159,13 @@ def _dry_run_initial_push(
 def run_create_workflow(
     project_name: str,
     dry_run: bool = False,
-) -> None:
+    python_version: str | None = None,
+) -> int:
+    """Run initial setup in order; explicit gates control commit, remote setup, and push."""
+    config_report = validate_config()
+    if config_report.has_errors:
+        _print_report("Configuration", config_report)
+        _stop_if_errors(config_report)
     config = _load_config()
 
     development_root = Path(
@@ -167,7 +177,12 @@ def run_create_workflow(
     ).expanduser()
 
     project_root = development_root / project_name
-    python_executable = Path(sys.executable)
+    separation = validate_independent_paths(project_root, stage_root / project_name)
+    if separation.has_errors:
+        _print_report("Environment separation", separation)
+        _stop_if_errors(separation)
+    python_version = select_python_version(project_root, python_version)
+    python_executable = find_python(python_version)
 
     github_owner = config["github"]["organization"]
     ssh_host = config["github"]["ssh_host"]
@@ -185,8 +200,7 @@ def run_create_workflow(
     preflight_report = run_preflight(project_name)
     _print_report("Preflight", preflight_report)
 
-    if _stop_if_errors(preflight_report):
-        return
+    _stop_if_errors(preflight_report)
 
     if dry_run:
         structure_report = plan_project_structure(
@@ -204,8 +218,7 @@ def run_create_workflow(
         structure_report,
     )
 
-    if _stop_if_errors(structure_report):
-        return
+    _stop_if_errors(structure_report)
 
     if dry_run:
         python_report = plan_python_environment(
@@ -223,18 +236,19 @@ def run_create_workflow(
         python_report,
     )
 
-    if _stop_if_errors(python_report):
-        return
+    _stop_if_errors(python_report)
 
     if dry_run:
         files_report = plan_project_files(
             project_root,
             project_name,
+            python_version,
         )
     else:
         files_report = create_project_files(
             project_root,
             project_name,
+            python_version,
         )
 
     _print_report(
@@ -242,8 +256,7 @@ def run_create_workflow(
         files_report,
     )
 
-    if _stop_if_errors(files_report):
-        return
+    _stop_if_errors(files_report)
 
     if dry_run:
         git_init_report = _dry_run_git_repository(
@@ -259,14 +272,17 @@ def run_create_workflow(
         git_init_report,
     )
 
-    if _stop_if_errors(git_init_report):
-        return
+    _stop_if_errors(git_init_report)
 
     identity_cwd = (
         project_root
         if project_root.exists()
         else development_root
     )
+
+    # A preview may target a root that has not been created yet.
+    while not identity_cwd.exists():
+        identity_cwd = identity_cwd.parent
 
     git_identity_report = validate_git_identity(
         identity_cwd,
@@ -279,8 +295,7 @@ def run_create_workflow(
         git_identity_report,
     )
 
-    if _stop_if_errors(git_identity_report):
-        return
+    _stop_if_errors(git_identity_report)
 
     if dry_run:
         commit_plan = _dry_run_initial_commit(
@@ -296,8 +311,7 @@ def run_create_workflow(
         commit_plan,
     )
 
-    if _stop_if_errors(commit_plan):
-        return
+    _stop_if_errors(commit_plan)
 
     if not dry_run and not all(
         result.status is Status.SKIP
@@ -313,16 +327,15 @@ def run_create_workflow(
                 commit_report,
             )
 
-            if _stop_if_errors(commit_report):
-                return
+            _stop_if_errors(commit_report)
         else:
             print()
             print("[SKIP] Initial Git commit not created")
             print(
-                "[ERROR] Workflow stopped before "
+                "[SKIP] Workflow stopped before "
                 "GitHub integration"
             )
-            return
+            return 3
 
     github_config_report = validate_github_configuration(
         github_owner,
@@ -336,8 +349,7 @@ def run_create_workflow(
         github_config_report,
     )
 
-    if _stop_if_errors(github_config_report):
-        return
+    _stop_if_errors(github_config_report)
 
     github_configured = (
         bool(github_owner.strip())
@@ -350,7 +362,7 @@ def run_create_workflow(
         print()
         print("[SKIP] GitHub integration not configured")
         print("[SKIP] Staging not configured")
-        return
+        return 0
 
     ssh_report = validate_github_ssh(
         ssh_host,
@@ -361,8 +373,7 @@ def run_create_workflow(
         ssh_report,
     )
 
-    if _stop_if_errors(ssh_report):
-        return
+    _stop_if_errors(ssh_report)
 
     remote_url = expected_remote_url(
         github_owner,
@@ -390,8 +401,7 @@ def run_create_workflow(
         remote_plan,
     )
 
-    if _stop_if_errors(remote_plan):
-        return
+    _stop_if_errors(remote_plan)
 
     if dry_run:
         print()
@@ -409,6 +419,7 @@ def run_create_workflow(
             "Initial push",
             push_plan,
         )
+        _stop_if_errors(push_plan)
 
         stage_report = plan_stage(
             stage_root,
@@ -421,14 +432,13 @@ def run_create_workflow(
             stage_report,
         )
 
-        if _stop_if_errors(stage_report):
-            return
+        _stop_if_errors(stage_report)
 
         print()
         print(
             "[OK] Dry run complete; no changes were made"
         )
-        return
+        return 0
 
     remote_needs_creation = any(
         result.status is Status.CREATE
@@ -455,7 +465,7 @@ def run_create_workflow(
             print(
                 "[SKIP] Staging not configured"
             )
-            return
+            return 3
 
     remote_report = configure_github_remote(
         project_root,
@@ -469,8 +479,7 @@ def run_create_workflow(
         remote_report,
     )
 
-    if _stop_if_errors(remote_report):
-        return
+    _stop_if_errors(remote_report)
 
     push_plan = plan_initial_push(
         project_root,
@@ -481,8 +490,7 @@ def run_create_workflow(
         push_plan,
     )
 
-    if _stop_if_errors(push_plan):
-        return
+    _stop_if_errors(push_plan)
 
     push_needed = any(
         result.status is Status.CREATE
@@ -502,8 +510,7 @@ def run_create_workflow(
                 push_report,
             )
 
-            if _stop_if_errors(push_report):
-                return
+            _stop_if_errors(push_report)
         else:
             print()
             print(
@@ -512,13 +519,21 @@ def run_create_workflow(
             print(
                 "[SKIP] Staging not configured"
             )
-            return
+            return 3
 
+    # Resolve against GitHub after pushing; cached origin refs may be stale.
+    expected_commit, remote_report = verify_remote_commit(project_root)
+    _print_report("Staging source verification", remote_report)
+    _stop_if_errors(remote_report)
+
+    # Recheck now that paths exist, including aliases on case-insensitive filesystems.
+    _stop_if_errors(validate_independent_paths(project_root, stage_root / project_name))
     stage_report = create_stage(
         stage_root,
         project_name,
         remote_url,
         python_executable,
+        expected_commit=expected_commit,
     )
 
     _print_report(
@@ -526,10 +541,10 @@ def run_create_workflow(
         stage_report,
     )
 
-    if _stop_if_errors(stage_report):
-        return
+    _stop_if_errors(stage_report)
 
     print()
     print(
         "[OK] Project creation workflow complete"
     )
+    return 0

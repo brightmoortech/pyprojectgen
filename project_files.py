@@ -1,18 +1,24 @@
+"""Generate a fixed initial scaffold; mismatched existing files are never overwritten."""
+
 from pathlib import Path
 
 from models import Result, Status, ValidationReport
 
 
-PYTHON_VERSION = "3.12.10"
+from python_env import DEFAULT_PYTHON_VERSION
+
+PYTHON_VERSION = DEFAULT_PYTHON_VERSION
+SETUPTOOLS_VERSION = "80.9.0"
 PIP_VERSION = "25.0.1"
 PYTEST_VERSION = "9.1.1"
 
 
-def _file_contents(project_name: str) -> dict[str, str]:
+def _file_contents(project_name: str, python_version: str = PYTHON_VERSION) -> dict[str, str]:
+    """Define the initial scaffold and its versioned environment reconstruction recipe."""
     distribution_name = project_name.replace("_", "-")
 
     return {
-        ".python-version": f"{PYTHON_VERSION}\n",
+        ".python-version": f"{python_version}\n",
 
         ".gitignore": """\
 .venv/
@@ -49,18 +55,25 @@ Run:
 
 The bootstrap script creates the virtual environment, installs the
 required dependencies, installs the project in editable mode, and runs
-the test suite.
+the test suite. The generator does not run this development bootstrap automatically.
+
+Python is pinned in `.python-version` and `pyproject.toml`. Installation tools
+are pinned in `requirements-bootstrap.txt`; test dependencies are pinned in
+`requirements.txt`. Recreate `.venv` locally rather than copying it. Use the same
+source revision, Python version, and supported OS/architecture. This specification
+pins package versions; it is not an offline archive or a byte-identical build guarantee.
+After setup, maintain these specifications when changing dependencies.
 """,
 
         "pyproject.toml": f"""\
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools=={SETUPTOOLS_VERSION}"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "{distribution_name}"
 version = "0.1.0"
-requires-python = "=={PYTHON_VERSION}"
+requires-python = "=={python_version}"
 dependencies = []
 
 [project.optional-dependencies]
@@ -77,6 +90,7 @@ testpaths = ["tests"]
 
         "requirements-bootstrap.txt": f"""\
 pip=={PIP_VERSION}
+setuptools=={SETUPTOOLS_VERSION}
 """,
 
         "requirements.txt": f"""\
@@ -175,7 +189,8 @@ fi
 
 python -m pip install -r requirements-bootstrap.txt
 python -m pip install -r requirements.txt
-python -m pip install -e ".[test]"
+python -m pip install --no-build-isolation --no-deps -e .
+python -m pip check
 
 python -m pytest
 
@@ -187,10 +202,12 @@ echo "[OK] Bootstrap complete"
 def plan_project_files(
     project_root: Path,
     project_name: str,
+    python_version: str = PYTHON_VERSION,
 ) -> ValidationReport:
+    """Compare initial template content; any mismatch blocks setup without overwriting."""
     results: list[Result] = []
 
-    for relative_path, expected_content in _file_contents(project_name).items():
+    for relative_path, expected_content in _file_contents(project_name, python_version).items():
         path = project_root / relative_path
 
         if not path.exists():
@@ -214,6 +231,9 @@ def plan_project_files(
         current_content = path.read_text(encoding="utf-8")
 
         if current_content == expected_content:
+            if relative_path == "scripts/bootstrap.sh" and not path.stat().st_mode & 0o111:
+                results.append(Result(Status.CREATE, f"Restore bootstrap executable permission: {path}"))
+                continue
             results.append(
                 Result(
                     Status.SKIP,
@@ -234,10 +254,13 @@ def plan_project_files(
 def create_project_files(
     project_root: Path,
     project_name: str,
+    python_version: str = PYTHON_VERSION,
 ) -> ValidationReport:
+    """Write missing template files only after the entire file plan passes validation."""
     plan = plan_project_files(
         project_root=project_root,
         project_name=project_name,
+        python_version=python_version,
     )
 
     if plan.has_errors:
@@ -245,10 +268,15 @@ def create_project_files(
 
     results: list[Result] = []
 
-    for relative_path, content in _file_contents(project_name).items():
+    for relative_path, content in _file_contents(project_name, python_version).items():
         path = project_root / relative_path
 
         if path.exists():
+            # An interruption can leave complete content before chmod executes.
+            if relative_path == "scripts/bootstrap.sh" and not path.stat().st_mode & 0o111:
+                path.chmod(0o755)
+                results.append(Result(Status.CREATE, f"Restored bootstrap executable permission: {path}"))
+                continue
             results.append(
                 Result(
                     Status.SKIP,

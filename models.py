@@ -1,3 +1,5 @@
+"""Represent phase outcomes consistently so the controller can stop on reported errors."""
+
 from dataclasses import dataclass
 from enum import Enum
 

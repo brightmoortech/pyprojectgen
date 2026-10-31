@@ -1,4 +1,8 @@
+"""Check initial setup prerequisites before generating project resources."""
+
 from pathlib import Path
+import keyword
+import re
 import shutil
 import subprocess
 import sys
@@ -16,13 +20,15 @@ def _validate_project_name(project_name: str) -> list[Result]:
             )
         ]
 
-    if not project_name.isidentifier():
+    distribution_name = project_name.replace("_", "-")
+    valid_distribution = re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?", distribution_name)
+    if not project_name.isidentifier() or keyword.iskeyword(project_name) or not valid_distribution:
         return [
             Result(
                 Status.ERROR,
                 (
-                    "Project name must be a valid Python identifier "
-                    "using letters, numbers, and underscores"
+                    "Project name must be an ASCII Python identifier, must not be a keyword, "
+                    "and must start with a letter and end with a letter or digit"
                 ),
             )
         ]
@@ -97,6 +103,7 @@ def _validate_git() -> list[Result]:
 
 
 def run_preflight(project_name: str) -> ValidationReport:
+    """Collect configuration, naming, interpreter, and Git checks before setup."""
     results: list[Result] = []
 
     if CONFIG_PATH.exists():

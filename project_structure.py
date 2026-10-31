@@ -1,3 +1,5 @@
+"""Plan or create the fixed src-layout directory scaffold without deleting existing content."""
+
 from pathlib import Path
 
 from models import Result, Status, ValidationReport
@@ -7,6 +9,7 @@ def plan_project_structure(
     development_root: Path,
     project_name: str,
 ) -> ValidationReport:
+    """Inspect scaffold paths without writing them; incompatible objects are errors."""
     project_root = development_root / project_name
 
     planned_paths = (
@@ -66,6 +69,7 @@ def create_project_structure(
     development_root: Path,
     project_name: str,
 ) -> ValidationReport:
+    """Create missing scaffold directories after checking the complete directory plan."""
     report = plan_project_structure(
         development_root=development_root,
         project_name=project_name,

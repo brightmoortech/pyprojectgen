@@ -1,3 +1,5 @@
+"""Build staging from a verified remote commit without changing conflicting checkouts."""
+
 from pathlib import Path
 import subprocess
 
@@ -37,6 +39,7 @@ def plan_stage(
     project_name: str,
     remote_url: str,
 ) -> ValidationReport:
+    """Describe staging work without cloning or installing; execution verifies the revision."""
     results: list[Result] = []
 
     project_root = stage_root / project_name
@@ -133,7 +136,22 @@ def plan_stage(
         )
     )
 
+    results.append(Result(Status.WARNING, "Execution will verify remote identity, clean checkout, and the published commit before installing"))
     return ValidationReport(results=tuple(results))
+
+
+def validate_stage_checkout(project_root: Path, remote_url: str, expected_commit: str) -> ValidationReport:
+    """Reject stale, dirty, or unrelated staging trees; never reset user work."""
+    origin = _run_command(["git", "remote", "get-url", "origin"], cwd=project_root)
+    head = _run_command(["git", "rev-parse", "HEAD"], cwd=project_root)
+    status = _run_command(["git", "status", "--porcelain", "--untracked-files=all"], cwd=project_root)
+    if origin.returncode or origin.stdout.strip() != remote_url:
+        return ValidationReport((Result(Status.ERROR, "Existing staging origin differs from the intended remote; review the directory manually"),))
+    if head.returncode or head.stdout.strip() != expected_commit:
+        return ValidationReport((Result(Status.ERROR, f"Staging is not at intended GitHub commit {expected_commit}; no reset performed. Review/update the checkout manually and rerun"),))
+    if status.returncode or status.stdout.strip():
+        return ValidationReport((Result(Status.ERROR, "Staging has local or untracked changes, an interrupted checkout, or unreadable Git status. Nothing was reset. Inspect git status and follow README.md: Interrupted staging checkout recovery"),))
+    return ValidationReport((Result(Status.OK, f"Staging origin and clean checkout match commit {expected_commit}"),))
 
 
 def create_stage(
@@ -141,7 +159,9 @@ def create_stage(
     project_name: str,
     remote_url: str,
     python_executable: Path,
+    expected_commit: str | None = None,
 ) -> ValidationReport:
+    """Reconstruct staging at the verified commit, then install and test independently."""
     results: list[Result] = []
 
     project_root = stage_root / project_name
@@ -156,6 +176,9 @@ def create_stage(
                 ),
             )
         )
+
+    if not expected_commit:
+        return ValidationReport((Result(Status.ERROR, "Staging requires a verified GitHub commit before any installation"),))
 
     selected_version = _python_version(python_executable)
 
@@ -203,6 +226,7 @@ def create_stage(
             [
                 "git",
                 "clone",
+                "--no-checkout",
                 remote_url,
                 str(project_root),
             ]
@@ -220,12 +244,20 @@ def create_stage(
                 )
             )
 
+        checkout = _run_command(["git", "checkout", "--detach", expected_commit], cwd=project_root)
+        if checkout.returncode:
+            return ValidationReport((Result(Status.ERROR, f"Cannot check out verified commit: {checkout.stderr.strip()}"),))
         results.append(
             Result(
                 Status.CREATE,
                 f"Staging repository cloned: {project_root}",
             )
         )
+
+    checkout_report = validate_stage_checkout(project_root, remote_url, expected_commit)
+    results.extend(checkout_report.results)
+    if checkout_report.has_errors:
+        return ValidationReport(tuple(results))
 
     version_file = project_root / ".python-version"
 
@@ -255,6 +287,11 @@ def create_stage(
         return ValidationReport(results=tuple(results))
 
     if venv_path.exists():
+        from python_env import plan_python_environment
+        environment_report = plan_python_environment(project_root, python_executable)
+        results.extend(environment_report.results)
+        if environment_report.has_errors:
+            return ValidationReport(tuple(results))
         venv_python = venv_path / "bin" / "python"
 
         if not venv_python.is_file():
@@ -378,6 +415,7 @@ def create_stage(
             "install",
             ".",
             "--no-deps",
+            "--no-build-isolation",
         ],
         cwd=project_root,
     )
@@ -398,6 +436,11 @@ def create_stage(
             "Project installed non-editably in staging",
         )
     )
+
+    dependency_check = _run_command([str(venv_python), "-m", "pip", "check"], cwd=project_root)
+    if dependency_check.returncode:
+        results.append(Result(Status.ERROR, f"Staging dependency validation failed: {dependency_check.stdout.strip()} {dependency_check.stderr.strip()}"))
+        return ValidationReport(tuple(results))
 
     test_result = _run_command(
         [

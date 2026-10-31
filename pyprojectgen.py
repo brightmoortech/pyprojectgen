@@ -1,4 +1,8 @@
+"""CLI for generic initial Python project setup; exit codes describe the outcome."""
+
 import argparse
+import subprocess
+import sys
 
 from config import init_config, validate_config
 from models import Result, ValidationReport
@@ -23,7 +27,8 @@ def print_report(report: ValidationReport) -> None:
         print("[OK] Validation passed")
 
 
-def main() -> None:
+def main() -> int:
+    """Dispatch implemented commands and return success, failure, or cancellation status."""
     parser = argparse.ArgumentParser(prog="pyprojectgen")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -53,20 +58,34 @@ def main() -> None:
         help="Show planned actions without modifying the system",
     )
 
+    create_parser.add_argument(
+        "--python", dest="python_version", metavar="X.Y.Z",
+        help="Exact installed Python version; new projects default to 3.12.10; reruns use the recorded pin",
+    )
+
     args = parser.parse_args()
 
-    if args.command == "config-init":
-        print_result(init_config())
-
-    elif args.command == "config-validate":
-        print_report(validate_config())
-
-    elif args.command == "create":
-        run_create_workflow(
+    try:
+        if args.command == "config-init":
+            result = init_config()
+            print_result(result)
+            return 0
+        if args.command == "config-validate":
+            report = validate_config()
+            print_report(report)
+            return 1 if report.has_errors else 0
+        return run_create_workflow(
             project_name=args.project_name,
             dry_run=args.dry_run,
-        )
+            python_version=args.python_version,
+        ) or 0
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.SubprocessError) as exc:
+        print(f"[ERROR] {exc}", file=sys.stderr)
+        return 1
+    except (EOFError, KeyboardInterrupt):
+        print("\n[SKIP] Setup interrupted; completed resources were retained", file=sys.stderr)
+        return 130
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

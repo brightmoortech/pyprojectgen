@@ -1,3 +1,5 @@
+"""Validate SSH access, configure origin, and publish or verify the initial source revision."""
+
 from pathlib import Path
 import subprocess
 
@@ -23,6 +25,7 @@ def validate_github_configuration(
     private_key: str,
     public_key: str,
 ) -> ValidationReport:
+    """Check integration settings and key files without creating credentials."""
     results: list[Result] = []
 
     if not organization.strip():
@@ -96,6 +99,7 @@ def validate_github_configuration(
 
 
 def validate_github_ssh(ssh_host: str) -> ValidationReport:
+    """Use SSH configuration or the agent to test noninteractive authentication."""
     if not ssh_host.strip():
         return ValidationReport(
             results=(
@@ -161,6 +165,7 @@ def plan_github_remote(
     project_name: str,
     ssh_host: str,
 ) -> ValidationReport:
+    """Require the expected origin URL; never replace a conflicting remote."""
     if not organization.strip() or not ssh_host.strip():
         return ValidationReport(
             results=(
@@ -223,6 +228,7 @@ def configure_github_remote(
     project_name: str,
     ssh_host: str,
 ) -> ValidationReport:
+    """Add a missing origin after validating that no conflicting remote exists."""
     plan = plan_github_remote(
         project_root=project_root,
         organization=organization,
@@ -274,6 +280,7 @@ def configure_github_remote(
 
 
 def plan_initial_push(project_root: Path) -> ValidationReport:
+    """Inspect branch tracking using cached refs; final staging verifies the live remote."""
     branch_result = _run_command(
         ["git", "branch", "--show-current"],
         cwd=project_root,
@@ -419,6 +426,7 @@ def plan_initial_push(project_root: Path) -> ValidationReport:
 
 
 def push_initial_branch(project_root: Path) -> ValidationReport:
+    """Push without force after the controller obtains user confirmation."""
     plan = plan_initial_push(project_root)
 
     if plan.has_errors:
@@ -462,3 +470,28 @@ def push_initial_branch(project_root: Path) -> ValidationReport:
             ),
         )
     )
+
+def verify_remote_commit(project_root: Path) -> tuple[str | None, ValidationReport]:
+    """Require the current commit to be published as the remote branch tip.
+
+    Query the remote directly: local tracking refs alone cannot prove freshness.
+    A mismatch needs user review rather than an implicit merge or branch change.
+    """
+    results = []
+    branch = _run_command(["git", "branch", "--show-current"], cwd=project_root)
+    commit = _run_command(["git", "rev-parse", "HEAD"], cwd=project_root)
+    if branch.returncode or commit.returncode or not branch.stdout.strip():
+        return None, ValidationReport((Result(Status.ERROR, "Staging requires a committed, named development branch"),))
+    remote = _run_command(
+        ["git", "ls-remote", "--exit-code", "origin", f"refs/heads/{branch.stdout.strip()}"],
+        cwd=project_root,
+    )
+    lines = remote.stdout.strip().splitlines()
+    if remote.returncode or len(lines) != 1:
+        message = remote.stderr.strip() or "branch is missing or could not be resolved"
+        results.append(Result(Status.ERROR, f"Cannot verify GitHub branch: {message}"))
+    elif lines[0].split()[0] != commit.stdout.strip():
+        results.append(Result(Status.ERROR, "Development HEAD differs from the current GitHub branch tip. Review and synchronize the branch before staging"))
+    else:
+        results.append(Result(Status.OK, f"GitHub branch matches development commit {commit.stdout.strip()}"))
+    return (None if any(r.status is Status.ERROR for r in results) else commit.stdout.strip()), ValidationReport(tuple(results))
