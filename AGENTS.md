@@ -1,6 +1,6 @@
 # Instructions for maintaining pyprojectgen
 
-Instruction version: 1.0
+Instruction version: 1.1
 
 ## Purpose and scope
 
@@ -57,6 +57,24 @@ rewriting earlier behavior as if it had always existed. The existing 0.2.1
 preservation map is historical evidence for that release, not a table to rewrite
 for every later edit. Add a new comparison only when a later change warrants it.
 Correct factual errors transparently without erasing the original context.
+
+### BACKLOG.md
+
+Maintain planned enhancements and deferred work here, using the uppercase filename
+`BACKLOG.md`. Read relevant entries before proposing or implementing related changes.
+
+Give each item a stable ID, status, current limitation, desired outcome, and any
+material dependencies or unresolved decisions. Reuse existing entries rather than
+duplicating them; update the last-updated date when content changes. Distinguish
+proposals, approved scope, and completed implementation. Recording or approving a
+backlog item does not itself authorize implementation; obtain approval for its
+implementation plan unless the current request already provides that approval.
+
+Update affected entries when scope, decisions, progress, or completion changes.
+Retain completed, deferred, and superseded entries as history, linking replacements
+where relevant. Mark work complete only with implementation and validation evidence.
+Keep README descriptions of current behaviour separate from planned features;
+record delivered changes in CHANGES.md and test evidence in VALIDATION.md.
 
 ### VALIDATION.md
 

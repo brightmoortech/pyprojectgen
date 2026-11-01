@@ -4,6 +4,13 @@ Release: 0.2.1
 Date: 2026-10-31
 Host: Linux, Python 3.12.14
 
+## Current status (recorded 2026-11-01)
+
+The 0.2.1 audit follow-up has passing 23-test results on Linux and on the user's
+Mac. The later Mac entry below resolves the historical pending status. Subsequent
+README and maintenance-record updates changed no executable code. Earlier entries
+remain evidence for their original revisions and conditions.
+
 ## Measured results
 
 All 16 tests passed with integration installation enabled (22.358 seconds).
@@ -126,3 +133,52 @@ stops, existing-file conflict handling, and resource-based resumption.
 All eleven original modules remain. No build/deployment features or automatic
 package removal were introduced. Mac validation of this follow-up is pending;
 the earlier Mac results above must not be treated as verification of this candidate.
+
+## Mac validation of the audit follow-up
+
+Recorded: 2026-11-01. Release: 0.2.1. Evidence: user-supplied terminal output,
+reported after pushing commit `0b943f9` on branch `pyprojectgen-v0.2`. The test
+output itself did not print the commit, exact macOS version, or Python version.
+The actual execution date was not printed by the command.
+
+```bash
+PG_RUN_INSTALL_TESTS=1 python3 -m unittest discover -s tests -v
+```
+
+Result: 23 tests passed, no failures or skips, in 12.421 seconds. The output
+includes the real development bootstrap and independent staging reproduction
+test, as well as validation, confirmation, conflict, and retry checks.
+
+This resolves the previously pending Mac test run for the audit follow-up. It
+supplements the Linux evidence; it does not verify live GitHub authentication,
+remote staging, production deployment, or every Python/OS combination.
+
+## README review and documentation checks
+
+Date: 2026-11-01. Release: 0.2.1, documentation-only working changes.
+Evidence: assistant-executed source/CLI inspection and documentation checks.
+These changes have not been committed to the user's repository by the assistant.
+
+Completed two review-and-fix passes: implementation accuracy, followed by
+terminology, information flow, repetition, and audience-appropriate detail.
+Reviewed the three-phase structure, phase outputs and recovery, exact Python
+selection, file population, separate development bootstrap, and local staging
+limitations against the source. Corrected ambiguous wording about installing
+Python and made the current exact-version default requirement explicit.
+
+Checked CLI help with:
+
+```bash
+python3 pyprojectgen.py --help
+python3 pyprojectgen.py create --help
+```
+
+Twenty documentation checks passed, covering links and anchors, Markdown fences
+and whitespace, implemented phases, agreed terms and placeholders, current Python
+default, test count, generated-file coverage, recovery-heading consistency, and
+Bash example syntax checked with `bash -n`. Byte comparisons confirmed no
+executable code changes. The delivery archive was checked for ZIP integrity and
+consistency with its source files.
+
+Installation tests were not rerun for these documentation-only changes. These
+checks are documentation evidence, not additional runtime or deployment tests.
