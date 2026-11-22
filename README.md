@@ -1,424 +1,268 @@
 # pyprojectgen
 
-Version: 0.2.1
+**Version 0.2.1 · macOS and Linux · Python 3.12+**
 
-## Overview
+## 1. What is pyprojectgen?
 
-### Purpose and scope
+`pyprojectgen` creates the starting structure for a **new Python project**: folders for your code and tests, starter files, a separate Python environment (`.venv`), and a local Git repository. This saves you from setting up the same pieces for every project. If configured, it can also push the first commit to GitHub and test a separate local copy of the project.
 
-`pyprojectgen` creates a consistent starting point for Python projects: source and
-test directories, package specifications, a virtual environment, and Git version
-control. It is for developers familiar with basic Python and terminal commands
-who want to reduce repeated setup work and configuration inconsistencies.
+This guide assumes you know basic Python and terminal commands. The generator creates the **initial** project; you maintain the code and dependencies afterward. It does not deploy applications to production.
 
-A **project** is the Python codebase being created, together with its tests,
-package specifications, configuration, and setup script. **The generator** means
-`pyprojectgen`; **the generated project** means the project it creates.
+Set up your first project in three phases:
 
-The generator supports initial setup, including an optional local staging check.
-Afterward, you maintain the project and its package specifications. Production
-deployment is outside the current tool's scope.
+| Phase | What you do | What you get |
+| --- | --- | --- |
+| **1. Configure** | Enter and validate your preferences once. | Reusable settings for future projects. |
+| **2. Create** | Name the project, use the default Python version or choose another, and respond to prompts. | Project structure, starter files, `.venv`, and local Git repository; optional GitHub publishing and staging check. |
+| **3. Bootstrap** | Run the script created in your new project. | Development project and test packages installed; starter test run. |
 
-### Setup phases: inputs and outputs
+Phase 2 creates the development environment, but **Phase 3 is required to install the project and run its initial test**. Optional GitHub publishing and staging occur during Phase 2.
 
-| Phase | Input | Action | Output |
-| --- | --- | --- | --- |
-| **1. Configure the generator** | Your directory preferences, Git name/email, and optional GitHub settings | Create, edit, and validate `~/.pyprojectgenrc`. | Settings used to create projects. |
-| **2. Create the project** | Configuration, project name, and selected Python version | Run `create` and respond to its prompts. | Project files, development `.venv`, and local Git repository. If configured, published GitHub code and an independently installed and tested local staging copy. |
-| **3. Bootstrap development** | Generated project and its package specifications | Run the generated bootstrap script separately. | Required packages and project installed in development, with tests passed. |
+## 2. What do I need?
 
-Configure the generator once and reuse the settings for later projects. You can
-complete the phases in one session or return to them later. Within Phase 2,
-`create` automates its steps and pauses at confirmation prompts. On retry, it
-checks existing resources and reuses compatible work; some interruptions or
-conflicts require manual recovery. Retry guidance appears within each phase.
+- **macOS or Linux** with Bash.
+- **Python 3.12 or newer** to run `pyprojectgen`.
+- **Git** installed and available as `git`, with a name and email configured for commits.
+- An **exact Python version** for the new project. The default is **3.12.10**, which must be installed even if you have a newer version. You can instead specify another installed version with `--python X.Y.Z` (for example, `--python 3.12.14`).
+- Access to the required Python packages from your configured package index when running bootstrap (normally an internet connection).
 
-Optional local staging runs inside `create`, before the separate development
-bootstrap command in Phase 3.
+Check your environment in a terminal:
 
-## Key terms
+```bash
+python3 --version
+git --version
+git config user.name
+git config user.email
+```
 
-| Term | Meaning |
-| --- | --- |
-| Development | The project copy where you edit code. |
-| Staging | An environment for testing changes before production. This tool provides only a limited **local staging** installation and test check, described in Phase 2. |
-| Virtual environment (`.venv`) | The project's isolated Python environment. Development and local staging each have their own. |
-| Bootstrap | The generated script that installs required packages and the development project, then runs its tests. |
-| Pinned version | An exact recorded version used when recreating an environment. |
+If either Git value is blank, configure it in Git before continuing. In the current release, you must repeat the **same name and email** in the generator's configuration (Section 4). The generator checks the effective Git values where it creates the project and does not change them.
 
-## Prerequisites
+GitHub is **optional**. If you want it, you also need a GitHub account or organization, working SSH access, and existing SSH key files; see [Section 8](#8-what-are-the-optional-capabilities).
 
-- macOS or Linux with Bash.
-- Python 3.12 or newer to run the generator.
-- Git installed and available through the `git` command.
-- `~/.pyprojectgenrc` configured in Phase 1.
+## 3. How do I install or run pyprojectgen?
 
-Git is mandatory. GitHub integration and local staging are optional.
+**Use the source folder for this release.** Download the repository ZIP and extract it, or clone the repository. Open a terminal in the `pyprojectgen` folder containing `pyprojectgen.py`.
 
-## Phase 1: Configure the generator
+Whenever you run a generator command in this guide, use that folder. You can keep the source folder and reuse it to create additional projects.
 
-### Create and edit the configuration
+Verify that it runs:
 
-Run these commands from the `pyprojectgen` directory, the folder containing
-`pyprojectgen.py`. The examples run the source directly; installing the generator
-as a package is optional.
+```bash
+python3 pyprojectgen.py --help
+```
+
+You should see the `config-init`, `config-validate`, and `create` commands. The commands in this guide run directly from the source; no installation step is needed for that method. The package also supports installation as a Python CLI, but the all-users installer is not implemented. Proposed installation improvements are tracked in [BACKLOG.md](BACKLOG.md).
+
+All generator commands below use `python3 pyprojectgen.py` from the source folder. Bootstrap and project tests run from the generated project folder.
+
+## 4. How do I configure it? (Phase 1)
+
+Each user creates their own `~/.pyprojectgenrc` file once. It tells the generator where to put projects and whether to use GitHub. You can edit it later when your preferences change.
+
+**Step 1: Create the configuration file.** From the generator source folder:
 
 ```bash
 python3 pyprojectgen.py config-init
 ```
 
-If the configuration file already exists, this command leaves it unchanged.
-Edit `~/.pyprojectgenrc` using its comments as guidance.
+This creates `~/.pyprojectgenrc` in your home directory if it does not exist; an existing file is left unchanged. Open the file in a text editor and enter your settings. Here is a **local-only example** (replace the paths, name, and email; keep the GitHub and SSH values empty):
 
-| File created | Initial contents and purpose |
-| --- | --- |
-| `~/.pyprojectgenrc` | A commented configuration template. Fill in your settings before creating a project. |
+```toml
+[paths]
+development_root = "/absolute/path/to/develop"
+stage_root = "/absolute/path/to/stage"
 
-The Git name and email used in the development directory must match the settings
-in this file. For optional GitHub integration, SSH access must already work with
-the configured host. The generator checks the configured key files, while SSH
-selects the identity through your SSH configuration or agent. The generator does
-not change your Git or SSH settings.
+[github]
+organization = ""
+ssh_host = ""
 
-### Validate the configuration
+[git]
+user_name = "Your Git Name"
+user_email = "you@example.com"
+
+[ssh]
+private_key = ""
+public_key = ""
+```
+
+| Setting | Your responsibility | What pyprojectgen does |
+| --- | --- | --- |
+| `paths.development_root` | Set an absolute path for development projects. | Creates `<development_root>/<project_name>` during project creation. |
+| `paths.stage_root` | Set a **different**, independent absolute path, even if you won't use staging. | Uses it only when optional staging runs. |
+| `git.user_name`, `git.user_email` | Match the effective `git config user.name` and `git config user.email`. | Checks that they match; does not change Git settings. |
+| `github.*`, `ssh.*` | Leave values empty for local-only use. | Skips GitHub and staging when integration is not configured. |
+
+Use two different paths for development and staging, preferably in separate sibling directories. Both must be writable by your user or available to create. The generator creates the project-specific subdirectory; you do **not** create it yourself. GitHub/SSH settings are explained in [Section 8](#8-what-are-the-optional-capabilities).
+
+**Step 2: Validate the file.**
 
 ```bash
 python3 pyprojectgen.py config-validate
 ```
 
-Correct reported errors before creating a project. Warnings about unconfigured
-GitHub settings are expected for local-only use. This command checks settings and
-local paths. The `create` command also checks your Git name/email and, if
-configured, GitHub access.
+Correct any errors and rerun validation. Warnings about GitHub being unconfigured are normal for local-only use. **You can proceed when validation reports success, including success with GitHub warnings.** The generator will not create a missing configuration file when you run `create`.
 
-### Retrying configuration
+## 5. How do I create my first project? (Phase 2)
 
-Edit the existing file and rerun `config-validate` until errors are resolved.
-Rerunning `config-init` preserves the existing file rather than replacing it.
+We'll create a local project named `demo`. For the first run, leave GitHub/SSH values empty in the configuration. Run these commands from the **generator source folder**, not the directory where `demo` will be created.
 
-## Phase 2: Create the project
-
-Run commands in this phase from the `pyprojectgen` directory. The examples use
-`demo` as the project name; replace it with your own project name.
-
-### Select the Python version
-
-Use `--python X.Y.Z` to select the exact Python version for the project's
-development and local staging virtual environments. That version must already
-be installed and discoverable by the generator.
-
-New projects currently default to **3.12.10** and require that exact installed
-version. A newer version alone does not satisfy the default. To use an installed
-Python 3.12.14 instead, add `--python 3.12.14` to the commands below. The generator
-does not install Python or automatically substitute another version.
-
-### Preview with `--dry-run`
+**Step 1: Preview the project.**
 
 ```bash
 python3 pyprojectgen.py create demo --dry-run
 ```
 
-Use the preview to review what will be created or reused and catch configuration
-problems before making changes. It leaves project files unchanged and asks for no
-confirmations. If GitHub is configured, it still tests SSH access. Package
-installation and final remote-commit verification occur during actual execution.
+The preview checks the configuration and planned actions without creating project resources or asking for confirmations. It also checks SSH access if GitHub integration is configured.
 
-### Run the `create` command
+If Python **3.12.10** is not installed, supply another exact version you already have. For example, with Python 3.12.14:
 
-After reviewing the preview, run the command without `--dry-run`, retaining any
-`--python` option you selected:
+```bash
+python3 pyprojectgen.py create demo --python 3.12.14 --dry-run
+```
+
+**Step 2: Create the project.** Keep the same Python version you used for the preview:
 
 ```bash
 python3 pyprojectgen.py create demo
 ```
 
-### Automated steps and outputs
+If you previewed with the alternate Python version, run this instead:
 
-`create` performs these steps in order:
+```bash
+python3 pyprojectgen.py create demo --python 3.12.14
+```
 
-| Step | Purpose |
-| --- | --- |
-| Validate | Check configuration, independent development/staging paths, selected Python version, project name, and Git. |
-| Create directories | Prepare the development project directory structure. |
-| Create the environment | Record the Python version and create or validate the development `.venv`. |
-| Initialize project files | Create and populate the initial project files listed below. |
-| Initialize Git | Initialize `main` if needed and check the Git name/email. |
-| Commit | Ask before staging all unignored project files and committing them. |
-| Connect to GitHub, if configured | Check SSH access, configure `origin`, and ask before pushing. |
-| Set up local staging, if configured | Verify the published commit, clone it independently, install the project and packages, and run tests. |
+The generator creates the project folder, `.venv`, and starter files, then initializes Git on `main`. It asks whether to make the first commit. **`y` approves; Enter or `n` declines** (the default is No). The commit stages all unignored files using `git add .`. If you want to review them first, decline, inspect the project, then rerun the same `create` command to reach the commit prompt again. Declining does not undo files already created.
 
-Development outputs below are relative to
-`<development_root>/<project_name>`. `development_root` is the setting in
-`~/.pyprojectgenrc`; `project_name` is the name supplied to `create`. Replace
-angle-bracket placeholders with your values before running commands.
+With the local-only configuration in this example, creation stops after the Git steps. If you enable GitHub publishing, additional work runs during this phase; see [Section 8](#8-what-are-the-optional-capabilities).
 
-| Creating step | Directory or file | Initial contents and purpose |
-| --- | --- | --- |
-| Create directories | Project directory; `src/<project_name>/`, `tests/`, `scripts/`, `.vscode/` | Locations for source, tests, scripts, and editor settings. |
-| Create the environment | `.venv/` | Development Python environment, ready for Phase 3 installation. |
-| Create the environment | `.python-version` | The selected exact Python version; checked again during file initialization. |
-| Initialize project files | `pyproject.toml` | Project name, initial version `0.1.0`, exact Python requirement, setuptools build requirement, pytest test dependency, and package/test settings. Application dependencies start empty. |
-| Initialize project files | `requirements-bootstrap.txt` | Exact versions of pip and setuptools used for installation. |
-| Initialize project files | `requirements.txt` | Exact versions of pytest and its dependencies: iniconfig, packaging, pluggy, and Pygments. |
-| Initialize project files | `src/<project_name>/__init__.py` | An empty Python package. |
-| Initialize project files | `tests/test_import.py` | A test that imports the generated package. |
-| Initialize project files | `scripts/bootstrap.sh` | Executable development installation and test script. |
-| Initialize project files | `.gitignore` | Exclusions including `.venv`, caches, build output, and `.env`. |
-| Initialize project files | `.env.example` | A commented placeholder for application environment variables. |
-| Initialize project files | `.vscode/settings.json` | VS Code setting pointing to the project's `.venv`. |
-| Initialize project files | `README.md` | Initial instructions for the generated project. |
-| Initialize Git | `.git/` | Local Git history and repository settings. Later commit and remote steps update it. |
-| Set up local staging | `<stage_root>/<project_name>/` and its `.venv/` | Verified source checkout and independently installed environment. `stage_root` comes from `~/.pyprojectgenrc`. |
+After the local creation steps finish, your files are in `<development_root>/demo`. **You still need to bootstrap the development environment** (Section 7). Before that, Section 6 shows you what was created.
 
-In package metadata, underscores in the project name become hyphens, for example
-`invoice_tools` becomes `invoice-tools`.
+## 6. What did the tool create?
 
-### Confirmation prompts
-
-The three possible prompts are to create the initial commit, confirm that the
-GitHub repository exists, and push the branch. Each defaults to No. Declining
-retains completed work and stops dependent steps. Completed actions may be skipped
-on retry. Inspect the project before approving a commit: it uses `git add .`.
-
-If asked to create the GitHub repository, create an empty repository under the
-configured owner with the project name, then confirm. GitHub repository creation
-is manual. With integration unconfigured, `create` finishes its local portion and
-skips GitHub and local staging. Invalid integration settings can stop execution.
-
-### Local staging: purpose and limitations
-
-Production-like staging should test the intended deployment method and relevant
-runtime conditions before production. **The current local staging function is
-much more limited: it checks package installation and runs project tests in a
-separate environment.**
-
-After publication, the generator verifies that the live GitHub branch matches
-the development commit. It clones into the local staging directory and checks out
-that exact commit directly, using detached HEAD mode. It creates a separate
-`.venv`, installs the committed tools and test dependencies, installs the project
-non-editably, checks dependency compatibility, and runs pytest. Non-editable
-installation uses an installed package copy rather than linking to development
-source. An existing staging copy must have the intended remote and commit and no
-local or untracked changes.
-
-This does not provision or validate a production-like deployment, containers,
-databases, application services, networking, or application startup. It builds and
-installs from the checked-out source rather than testing a separately supplied
-production artifact. The generated import test is not application acceptance
-or production-readiness testing.
-
-Local staging is inexpensive and quick, but shares a machine with development:
-
-| Limitation or risk | Consequence |
-| --- | --- |
-| Same operating system and machine setup | Machine-specific assumptions and differences from production may remain undetected. |
-| Shared CPU, memory, and storage | Workloads can compete for resources; a machine failure affects both environments. |
-| Same user permissions | Separate directories and `.venv` environments are not a security boundary. Code running as that user can access both locations. |
-
-Moving this check to another machine alone would not provide full deployment
-validation. Remote staging with production-like installation is planned; see
-[Planned features](#planned-features).
-
-### Retrying `create` and recovering from errors
-
-Correct the reported cause and rerun the same `create` command from the
-`pyprojectgen` directory. Compatible resources are reused; conflicts stop execution
-without overwriting your files. Resumption checks the directories, files, and
-Git state already present.
-
-On retry, omitting `--python` uses the project's recorded `.python-version`.
-Requesting a different version stops execution. A mismatched or incomplete
-`.venv` requires manual review; it is not automatically deleted and rebuilt.
-
-Generated files must match the initial templates. The generator does not merge
-edits or update established projects. A matching bootstrap script with missing
-executable permission has that permission restored. Stale or conflicting staging
-copies are not automatically pulled, reset, or deleted.
-
-Until initial setup completes, let the setup commands manage `.venv`. If a manual
-repair is needed, preserve the declared package specifications.
-
-#### Interrupted staging checkout recovery
-
-An interruption between clone and checkout can leave Git history without source
-files. The generator stops for review rather than resetting the directory.
-
-1. Inspect the staging directory and its `git status`. Missing files alone do not
-   distinguish an interrupted checkout from user changes.
-2. Preserve the entire staging project directory by moving it to a separate,
-   unused backup location outside the development checkout.
-3. Once the intended staging project path is absent, rerun `create`. Keep the
-   backup until the fresh staging setup succeeds.
-
-The same approach applies to a partial staging clone. Preserve the development
-project and keep its environment separate.
-
-## Phase 3: Bootstrap development
-
-### Run the bootstrap script
-
-Run the generated bootstrap script to install the required packages and the
-project in development, then run its tests:
+Look in the project folder under your configured development root. For the example named `demo`, you'll find:
 
 ```text
-cd <development_root>/<project_name>
+<development_root>/demo/
+├── src/demo/__init__.py         # Python source package
+├── tests/test_import.py         # starter test
+├── scripts/bootstrap.sh         # next command to run
+├── pyproject.toml               # package metadata and requirements
+├── requirements.txt             # pinned test packages
+├── requirements-bootstrap.txt   # pinned installation tools
+├── .python-version              # exact Python version for this project
+├── .venv/                       # development Python environment
+├── .git/                        # local Git repository
+├── .gitignore                   # files excluded from Git
+├── .env.example                 # example application settings
+├── .vscode/settings.json        # VS Code interpreter setting
+└── README.md                    # instructions for this generated project
+```
+
+The generated package starts at version `0.1.0`. It has **no application dependencies yet**; `requirements.txt` lists test packages, while `requirements-bootstrap.txt` lists installation tools. The starter test only checks that Python can import your package. When a project name contains underscores, the package keeps them but its published distribution name uses hyphens (`invoice_tools` → `invoice-tools`).
+
+You maintain these files after initial setup. `pyprojectgen` does not merge changes into established projects or silently overwrite conflicting files.
+
+## 7. How do I use it afterward? (Phase 3)
+
+Now switch to the **new project directory**. Replace the example path with the `development_root` you entered in Phase 1:
+
+```bash
+cd /absolute/path/to/develop/demo
 ./scripts/bootstrap.sh
 ```
 
-Use `development_root` from `~/.pyprojectgenrc` and the project name supplied to
-`create`. Bootstrap reads the populated project specifications from Phase 2;
-it does not populate or update them.
+The generated script uses the version in `.python-version` to prepare or check the development `.venv`, install the pinned installation tools and test packages, install **your project in editable mode**, check package compatibility, and run the starter test. Editable mode means edits to your source are reflected without reinstalling the project each time.
 
-### Installation steps and outputs
+A successful run ends with:
 
-| Step | Result in the development project |
-| --- | --- |
-| Check Python and environment | Find the recorded Python version; create `.venv/` if missing, or check its Python version if it exists. |
-| Install tools | Install pip and setuptools from `requirements-bootstrap.txt` into `.venv/`. |
-| Install test dependencies | Install pytest and its four dependencies from `requirements.txt` into `.venv/`. |
-| Install the project | Read `pyproject.toml` and install the project into `.venv/` in editable mode. Source edits are available without reinstalling. |
-| Validate | Check dependency compatibility and run the generated import test with pytest. |
+```text
+[OK] Bootstrap complete
+```
 
-The initial specifications contain seven external packages: two installation
-tools and five test packages. The generated project itself is also installed.
-A successful run ends with `[OK] Bootstrap complete`.
-
-Initial setup is complete when the requested Phase 2 actions and development
-bootstrap succeed. You can then begin development. To run project tests again:
+**Your project is now ready for development.** Write your code under `src/demo/` and add tests under `tests/`. To run the tests again from the project directory:
 
 ```bash
 .venv/bin/python -m pytest
 ```
 
-### Retrying bootstrap
+Going forward, you own the source code, dependency specifications, and tests. Commit the source revision and package specifications to Git; do not copy `.venv` between machines. Pinned versions improve reproducibility but do not guarantee byte-identical builds or provide an offline package archive.
 
-After correcting an error, rerun `./scripts/bootstrap.sh` from the generated
-project directory. It retries installation and tests using the recorded
-specifications. It reuses an existing `.venv`; it does not automatically repair
-an incomplete environment, replace a wrong Python version, or remove extra
-packages. Review environment conflicts manually before retrying.
+## 8. What are the optional capabilities?
 
-## Testing the generator
+### GitHub publishing
 
-These tests check `pyprojectgen` itself. Run them from the `pyprojectgen`
-directory, not the generated project directory.
+GitHub is optional. If you want the generator to publish the first commit, set up SSH authentication to GitHub first. Then fill in these settings in `~/.pyprojectgenrc` and rerun `config-validate` **before** running `create`:
 
-### Run the tests
+| Setting | What to enter |
+| --- | --- |
+| `github.organization` | The GitHub username or organization that will own the project repository. |
+| `github.ssh_host` | A usable SSH host or alias, such as `github.com`. |
+| `ssh.private_key`, `ssh.public_key` | Absolute paths to your existing SSH key files. |
 
-Regression checks without package installation:
+The generator checks the key files and SSH connectivity; it does **not** generate keys, modify SSH configuration, or authenticate for you. During `create`, it asks you to confirm that an **empty GitHub repository** with the project name exists under the configured owner. You create that repository yourself. The generator then configures `origin`, asks before pushing (default **No**), and **runs the Git push** if you approve.
+
+### Local staging check
+
+If GitHub publishing succeeds, `create` automatically proceeds to local staging; **there is no separate staging choice or command in this version**. It verifies the published commit, clones that revision into `<stage_root>/<project_name>`, creates a **separate** `.venv`, installs the project **non-editably**, checks installed package compatibility, and runs tests.
+
+Unlike Phase 3's editable development install, this installation uses a separate copy of the committed code. It is a **limited installation-and-test check**, not a full rehearsal for production. It does **not** test application startup, containers, services, databases, networking, or a separately built production artifact. Both directories are on the same machine and share its resources and user permissions; they are not a security boundary. Passing the generated import test is not production-readiness evidence.
+
+This optional staging operation currently runs **within Phase 2**, before you run development bootstrap in Phase 3; it has no standalone command.
+
+## 9. Reference information
+
+### Generator commands
+
+Run these from the **generator source folder**. `NAME` stands for your desired project name; `X.Y.Z` stands for an exact installed Python version.
+
+| Command | Meaning |
+| --- | --- |
+| `python3 pyprojectgen.py --help` | Show CLI help. |
+| `python3 pyprojectgen.py config-init` | Create configuration template if absent. |
+| `python3 pyprojectgen.py config-validate` | Validate configuration without modifying it. |
+| `python3 pyprojectgen.py create NAME --dry-run` | Preview planned creation. |
+| `python3 pyprojectgen.py create NAME` | Create project (new-project default: Python 3.12.10). |
+| `python3 pyprojectgen.py create NAME --python X.Y.Z` | Use a specific installed Python version. |
+
+Project names must be ASCII Python identifiers, not keywords; start with a letter and end with a letter or digit. Names may contain underscores but not hyphens or spaces.
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | Success, including local-only creation and preview. |
+| `1` | Configuration, validation, or execution failure. |
+| `2` | Invalid command-line arguments. |
+| `3` | Confirmation declined; dependent operations stopped. |
+| `130` | Interrupted execution or unavailable confirmation input. |
+
+The **generated** bootstrap script exits with a nonzero status if it fails. The generator has no separate bootstrap, staging, or production command.
+
+### Testing pyprojectgen itself (for maintainers)
+
+These commands test the **generator**, not the new project's starter test. Run from the generator source folder:
 
 ```bash
+# Regression tests (installation test skipped unless enabled)
 python3 -m unittest discover -s tests -v
-```
 
-Full suite, including development/local staging installation and reproduction:
-
-```bash
+# Full suite, including real installation/reproduction test
 PG_RUN_INSTALL_TESTS=1 python3 -m unittest discover -s tests -v
 ```
 
-`PG_RUN_INSTALL_TESTS` is the suite's custom opt-in switch. The inline assignment
-sets it to `1` for this command; no configuration file or persistent setting is
-needed. Otherwise the installation test is skipped, unless the variable is
-already exported as `1`. `unittest discover` finds tests under `tests/`, and
-`-v` prints individual results.
-
-To run only the installation/reproduction test:
+To run just the installation/reproduction test:
 
 ```bash
 PG_RUN_INSTALL_TESTS=1 python3 -m unittest discover -s tests \
   -p test_setup.py -k test_real_development_bootstrap -v
 ```
 
-The current suite has 23 tests: the full run should pass all 23; the default run
-should pass 22 and skip one. A skipped test did not run. Failures and errors
-require investigation. See [VALIDATION.md](VALIDATION.md) for recorded results.
+The generator's test suite uses `unittest`; generated projects use `pytest` inside their own `.venv`. The opt-in installation test requires access to pinned packages and exercises development and staging using a **temporary local Git remote**, not live GitHub authentication. Tests normally use temporary directories (often `/tmp/` on Linux or `/var/folders/.../T/` on macOS) and clean them up. Forced termination may leave files, and pip's cache may remain. For dated execution results, consult [VALIDATION.md](VALIDATION.md).
 
-### Test design and temporary projects
+### Related documents
 
-The generator's suite uses `unittest`. Its installation test runs the generated
-projects' pytest tests inside their own environments. Pytest is not required in
-the environment running the generator's suite.
-
-Tests create isolated workspaces with `tempfile.TemporaryDirectory()`, using test
-configuration instead of your configured project directories. Workspaces contain
-temporary development projects, local Git repositories, staging copies, and
-virtual environments. They normally live under `/var/folders/.../T/` on macOS or
-`/tmp/` on Linux, depending on system settings.
-
-Cleanup runs after normal completion, including ordinary test failures. Forced
-termination or a crash can leave files behind. Pip's download cache may remain
-outside these workspaces.
-
-Some checks run actual commands; others simulate operations and confirmation
-responses. The full installation test executes development bootstrap, publishes
-to a local Git remote, installs and tests a separate staging copy, compares package
-versions, and retries staging. It needs Git, Bash, Python 3.12 or newer, and access
-to the pinned packages. It uses the Python version running the suite. No manual
-responses or personal GitHub access are required; live GitHub authentication and
-production deployment are not covered.
-
-## Recreating environments and current limits
-
-Keep the source revision and package specifications together in Git. Recreate
-`.venv` locally from those specifications and the recorded Python version rather
-than copying it between machines. Maintain the specifications as dependencies
-change after initial setup.
-
-Pinned versions assume compatible operating systems and architectures and
-available packages. They do not provide an offline package archive or guarantee
-byte-identical builds. Installation checks do not detect every unexpected extra
-package in an existing environment.
-
-## Planned features
-
-The following are not implemented:
-
-- Separate invocation of local staging after development bootstrap, as a fourth
-  phase. Local staging currently remains inside `create` (BL-001).
-- Remote staging with production-like artifact installation and runtime checks
-  (BL-002).
-- Detection and reporting of unexpected installed packages. Automatic package
-  removal is outside the current implementation.
-
-See [BACKLOG.md](BACKLOG.md) for the staging enhancement scope and decisions.
-
-## Command reference
-
-| Command | Purpose |
-| --- | --- |
-| `python3 pyprojectgen.py --help` | Show commands. |
-| `python3 pyprojectgen.py config-init` | Create the configuration template if missing. |
-| `python3 pyprojectgen.py config-validate` | Validate configuration without modifying it. |
-| `python3 pyprojectgen.py create NAME` | Run the automated creation workflow. |
-| `python3 pyprojectgen.py create NAME --python X.Y.Z` | Select the exact Python version for the project's environments. |
-| `python3 pyprojectgen.py create NAME --dry-run` | Preview creation without changing project resources. |
-
-An installed `pyprojectgen` command accepts the same arguments. There are no
-separate generator commands for bootstrap, staging, or production deployment.
-Development bootstrap is the generated script run in Phase 3.
-
-### Exit codes
-
-| Code | Meaning |
-| --- | --- |
-| `0` | Success, including preview or creation with optional integration unconfigured. |
-| `1` | Configuration, validation, or execution error. |
-| `2` | Invalid command-line arguments. |
-| `3` | A confirmation was declined; dependent steps stopped. |
-| `130` | Execution was interrupted or confirmation input unavailable. |
-
-These are generator CLI exit codes. The separate bootstrap script exits nonzero
-if a command fails.
-
-## Further information
-
-- [BACKLOG.md](BACKLOG.md): planned enhancements and deferred work.
-- [CHANGES.md](CHANGES.md): release changes and source-preservation history.
-- [VALIDATION.md](VALIDATION.md): recorded test runs and limitations.
-- [REPLACEMENT.md](REPLACEMENT.md): replacing an earlier generator version.
-- [AGENTS.md](AGENTS.md): maintenance instructions for coding assistants.
-
-## License
-
-MIT. See [LICENSE](LICENSE).
+- [BACKLOG.md](BACKLOG.md): future changes (not implemented commands).
+- [CHANGES.md](CHANGES.md): release history.
+- [VALIDATION.md](VALIDATION.md): test evidence and limitations.
+- [REPLACEMENT.md](REPLACEMENT.md): replacing an earlier generator release.
+- [AGENTS.md](AGENTS.md): repository maintenance instructions.
+- [LICENSE](LICENSE): MIT license.

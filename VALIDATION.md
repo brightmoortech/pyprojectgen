@@ -182,3 +182,10 @@ consistency with its source files.
 
 Installation tests were not rerun for these documentation-only changes. These
 checks are documentation evidence, not additional runtime or deployment tests.
+
+## 2026-11-22: README usability review (documentation only)
+
+- **Baseline:** User-supplied `pyprojectgen` v0.2.1 repository archive. The reviewed README was delivered separately and was not applied to the user's checkout. Its exact revision identifier or content hash was not recorded, so this entry cannot uniquely identify the reviewed README.
+- **Scope:** Reported reorganization for first-time readers, clarification of generator commands versus generated-project bootstrap, and subsequent removal of the troubleshooting section at the user's request. Future requirements were kept in `BACKLOG.md`.
+- **Evidence:** Earlier assistant reports describe source/documentation inspection and isolated local-only checks of CLI help, configuration initialization and validation, dry-run, and project creation with a declined commit. This entry does **not** independently verify those executions; their exact command transcript and execution record are unavailable here.
+- **Limitations:** No complete regression-suite pass was established for this revision. Development bootstrap installation, live GitHub operations, macOS end-to-end behavior, and the proposed system-wide installer were not validated. Previously recorded release-test results retain their original scope.

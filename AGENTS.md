@@ -34,7 +34,7 @@ uncertainty prevents reliable progress.
 
 ## Markdown Documentation Contracts
 
-Use `llm.software.documentation.process.md` for the universal documentation workflow and writing/review standards. Its first-time requirements clarification uses `llm.clarification.process.md`. The invoking prompt must provide access to those extensions; they are not assumed to be files in this repository. This section defines only pyprojectgen's Markdown inventory and document-specific requirements.
+Use `llm.software.documentation.process.md` for the universal documentation workflow and writing/review standards. Its first-time requirements clarification uses `llm.general.clarification.process.md`. The invoking prompt must provide access to those extensions; they are not assumed to be files in this repository. This section defines only pyprojectgen's Markdown inventory and document-specific requirements.
 
 The six repository-level documents below are required. Repository documentation filenames are uppercase. Generated project READMEs are template outputs, not additional repository-level maintenance records. Do not create additional reports or status files unless required by the assigned work.
 
