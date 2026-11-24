@@ -32,7 +32,8 @@ Separate generation-time inputs (project name, selected capabilities, supported 
 2. Establish the shared foundation and documentation templates; validate generation, clean installation and unit tests.
 3. Add PostgreSQL connectivity as an optional capability; validate driver compatibility and authentication.
 4. Add managed PostgreSQL infrastructure, environment management, identity and staging safety as a dependent capability; validate the complete setup and container replacement workflows.
-5. Add later capabilities only after their requirements are specified and approved. Validate each supported combination and regress the simpler blueprints when adding a capability.
+5. Add the reusable PostgreSQL initialization workflow as a separately specified capability after the applicable connectivity and environment foundations.
+6. Add later capabilities only after their requirements are specified and approved. Validate each supported combination and regress the simpler blueprints when adding a capability.
 
 This sequence is a proposed strategy, not implementation authorization or a commitment to a specific command syntax.
 
@@ -127,6 +128,9 @@ The following paths describe the proposed output contract, not an assertion that
 | `compose.yaml`, `src/<package>/_environment.py` | Shared infrastructure definition and provisioning configuration validation. | Managed PostgreSQL |
 | `scripts/manage_environment.py`, `src/<package>/_provisioning.py` | Operator-facing setup/check utility and internal provisioning logic. | Managed PostgreSQL |
 | `src/<package>/_test_safety.py`, `tests/conftest.py` | Shared mandatory staging verification and test harness integration. | Managed PostgreSQL |
+| `scripts/init_db.py`, `src/<package>/_initialization_connection.py`, `src/<package>/_migration_workflow.py` | Reusable privileged initialization entry point, connection prerequisites and ordered orchestration. | PostgreSQL initialization |
+| `src/<package>/_db_migrations.py`, `sql/migrations/` | Project-specific adapter, ordered SQL and seed definitions; generate a scaffold or supplied definitions only. | PostgreSQL initialization |
+| `tests/unit/test_initialization.py`, `tests/integration/test_db_initialization.py` | Workflow unit tests and project-specific database integration tests or scaffold. | PostgreSQL initialization |
 | `tests/unit/`, `tests/integration/`, `tests/e2e/` | Independent test suites; empty directories may use placeholders if required by Git. | Foundation |
 | `tests/unit/test_config.py`, `tests/unit/test_import.py` | Foundation import and applicable configuration tests. | As applicable |
 | `tests/unit/test_environment.py`, `tests/unit/test_provisioning.py`, `tests/integration/test_environment_management.py` | Configuration, provisioning and real infrastructure verification. | Managed PostgreSQL |
@@ -255,15 +259,26 @@ Before blueprint release, demonstrate that a generated project:
 - For PostgreSQL-enabled blueprints, uses external connection settings and protected credentials; validates real connectivity and driver compatibility on supported platforms.
 - For managed PostgreSQL blueprints, provisions isolated environments, safely reuses valid resources, prepares directories before requesting credentials, rejects conflicts and missing credentials with actionable messages, and leaves `check` read-only.
 - Demonstrates that container recreation preserves external data, roles and environment identity, and that unsafe database tests fail closed without affecting non-staging infrastructure.
+- For projects selecting initialization, verifies the existing target and prerequisites, demonstrates read-only planning and zero-change reruns, and verifies conflict rejection and atomic step rollback against isolated staging. Keeps generic orchestration independent of application definitions.
 - Records actual test evidence and tested revision, runs applicable regression tests, and completes both mandatory audit-and-correction passes before acceptance.
 
 Refine these proposed criteria against the existing pyprojectgen requirements and approved blueprint scope before implementation.
 
 ## 8. Additional Capabilities to Specify Later
 
-The following sections are intentionally blank pending further design and validation. Their presence does not authorize development.
+The following capabilities are future enhancements. Sections with insufficient design or validation evidence remain intentionally blank. Their presence does not authorize development.
 
 ### 8.1 Database Initialization and Migration Framework
+
+Offer a reusable privileged initialization workflow for PostgreSQL-enabled projects, separate from environment provisioning and runtime business APIs. Generate an entry point `scripts/init_db.py` with default dry run, explicit `--check`, and mutually exclusive `--apply`; help and invalid arguments must not connect or write. Require an existing target database and authorized setup role. Never create or drop the target database or change environment identity. Use protected libpq credentials, verify target, compatible PostgreSQL version, superuser privileges for the demonstrated setup model, and writable primary status; reject unsafe configuration and conflicting settings. For managed local environments, verify the independently provisioned identity before migration execution.
+
+Separate generic connection prerequisites (`src/<package>/_initialization_connection.py`) and ordered orchestration (`src/<package>/_migration_workflow.py`) from the project adapter (`src/<package>/_db_migrations.py`) and version-controlled `sql/migrations/` assets. The adapter supplies ordered, uniquely named migration steps and project-specific expected definitions. The project entry point supplies a stable project-specific advisory lock key. Generic orchestration receives the steps, connection, mode, lock key and reporting callback; it contains no application names, schema definitions, seed values or business policies. Use explicit composition rather than dynamic plugin discovery unless separately justified. A generated project defines its own schema, roles, constraints, triggers, seed manifest and permissions; do not generate unrelated business objects or a tracking table by default.
+
+Each migration implements a read-only check (compliant, missing work, or conflict), apply action and optional additional verification. Inspect all steps in a read-only transaction before any write. Apply only missing work in dependency order; serialize cooperating apply sessions, recheck each step, verify expected state before committing its transaction and perform final read-only verification. On failure roll back the failed step, stop later steps and report confirmed earlier commits without guessing uncertain commit outcomes. Never silently replace incompatible objects, overwrite valid credentials or overwrite administrator-edited seed metadata. Keep seed definitions in version-controlled data rather than parsing requirement documents at runtime. The adapter decides application-specific conflict semantics and verification criteria.
+
+Generate unit tests for argument handling, connection prerequisites, read-only planning, conflict-before-write, ordering, locking, failure/rollback and idempotency; generate only relevant integration-test infrastructure and require project-specific tests for actual catalog definitions, constraints, permissions, seed reconciliation and real transaction rollback. Use the guarded staging environment for database mutation and cleanup, preserving independent environment identity. Document installation, initialization and rerun behavior. Validate both default and explicit dry runs and repeated apply with zero changes. Capture actual execution evidence before blueprint acceptance.
+
+Standardize status terminology across generator, provisioning and initialization workflows during future consolidation. Do not change existing workflows merely to impose a proposed label convention before that work is specified.
 
 ### 8.2 PostgreSQL API and Security Patterns
 
@@ -291,6 +306,8 @@ The following records the level of evidence available when defining these reusab
 | PostgreSQL connectivity foundation | Native Psycopg binary installation/import and 60 passing unit tests demonstrated on macOS. |
 | Managed environment foundation | 156 passing unit tests reported independently in development and staging on macOS/Python 3.12.10; initial provisioning and read-only checks succeeded in both environments, and development setup rerun succeeded. |
 | Staging safety and persistence | Seven infrastructure integration cases reported passed in staging, including safe setup rerun, four identity mutation rejection cases, ordinary-role access protection, and controlled container recreation preserving database contents, roles, identity and unrelated infrastructure. Based on reported results; full per-case execution output is unavailable. |
-| Linux application deployment, database application initialization and later capabilities | Not yet validated; do not infer Linux deployment success from macOS results. |
+| Database initialization foundation | 188 unit cases passed independently in development and staging; 21 staging integration cases passed, including infrastructure regression and 14 database initialization cases. Development dry run, initial apply and zero-change reruns succeeded. These are reported source-project results, not generator tests. |
+| Manual database backup and restore | A basic logical backup and isolated recovery procedure was documented; execution is pending. Container recreation does not establish backup recoverability. |
+| Linux application deployment, full resource API and later capabilities | Not yet validated; do not infer Linux deployment success from macOS results. |
 
 Versions used in the demonstrated foundation: Python 3.12.10, PostgreSQL image `postgres:18.7-bookworm`, and `psycopg[binary]==3.3.9`. These are historical compatibility evidence, not mandatory permanent generator pins. Select and validate versions against the future supported-platform matrix. No pyprojectgen blueprint generation or acceptance tests have been executed for this brief.
