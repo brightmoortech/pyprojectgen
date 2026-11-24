@@ -260,9 +260,9 @@ The generator's test suite uses `unittest`; generated projects use `pytest` insi
 
 ### Related documents
 
-- [BACKLOG.md](BACKLOG.md): future changes (not implemented commands).
-- [CHANGES.md](CHANGES.md): release history.
-- [VALIDATION.md](VALIDATION.md): test evidence and limitations.
-- [REPLACEMENT.md](REPLACEMENT.md): replacing an earlier generator release.
+- [BACKLOG.md](pyprojectgen.wiki/BACKLOG.md): future changes (not implemented commands).
+- [CHANGES.md](pyprojectgen.wiki/CHANGES.md): release history.
+- [VALIDATION.md](pyprojectgen.wiki/VALIDATION.md): test evidence and limitations.
+- [REPLACEMENT.md](pyprojectgen.wiki/REPLACEMENT.md): replacing an earlier generator release.
 - [AGENTS.md](AGENTS.md): repository maintenance instructions.
 - [LICENSE](LICENSE): MIT license.
